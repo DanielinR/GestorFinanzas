@@ -8,7 +8,36 @@ import {
 } from "react-native";
 import Constants from "expo-constants";
 import { Button } from "react-native-web";
+import { useEffect, useState } from "react";
+
 export default function App() {
+  const [sumaMesActual, setsumaMesActual] = useState(0);
+  const [importeActual, setImporteActual] = useState("");
+
+  useEffect(() => {
+    fetchSumaMesActual();
+  }, []);
+
+  async function addMovimiento(signo) {
+    if (importeActual == 0) {
+      setImporteActual("");
+      return;
+    }
+    const response = await fetch(
+      `http://localhost:8080/movimiento/Sin Concepto/${signo * importeActual}`,
+      { method: "PUT" }
+    );
+    fetchSumaMesActual();
+    setImporteActual("");
+  }
+
+  async function fetchSumaMesActual() {
+    const response = await fetch(
+      "http://localhost:8080/movimientos/suma/mesActual"
+    );
+    const data = await response.json();
+    setsumaMesActual(data[0]["sum(Importe)"]);
+  }
   return (
     <View style={styles.general}>
       <StatusBar style="auto" />
@@ -18,19 +47,29 @@ export default function App() {
         </View>
         <View style={styles.profit}>
           <Text style={{ fontSize: 40, fontWeight: "400" }}>Profit:</Text>
-          <Text style={{ fontSize: 33, fontWeight: "300" }}>0,00€</Text>
+          <Text style={{ fontSize: 33, fontWeight: "300" }}>
+            {sumaMesActual != null ? sumaMesActual : "0.00"}€
+          </Text>
         </View>
         <View style={styles.sumadorRestador}>
-          <TouchableOpacity style={styles.botones}>
-            <Text>-</Text>
+          <TouchableOpacity
+            style={styles.botones}
+            onPress={() => addMovimiento(-1)}
+          >
+            <Text style={{ fontSize: 40, fontWeight: "300" }}>-</Text>
           </TouchableOpacity>
           <TextInput
+            value={importeActual}
+            onChangeText={(Text) => setImporteActual(Text)}
             keyboardType="number-pad"
-            placeholder="0,00"
+            placeholder="0.00€"
             style={styles.inputNumerico}
           ></TextInput>
-          <TouchableOpacity style={styles.botones}>
-            <Text>+</Text>
+          <TouchableOpacity
+            style={styles.botones}
+            onPress={() => addMovimiento(1)}
+          >
+            <Text style={{ fontSize: 40, fontWeight: "300" }}>+</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -42,7 +81,7 @@ const styles = StyleSheet.create({
   general: {
     flex: 1,
     flexDirection: "column",
-    backgroundColor: "#fff9",
+    backgroundColor: "#fff6",
     alignItems: "center",
     justifyContent: "space-around",
   },
@@ -74,8 +113,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   profit: {
-    flex: 2,
     // backgroundColor: "#f175",
+    // borderRadius: 20,
+    // padding: 15,
+    flex: 2,
     alignItems: "center",
     justifyContent: "center",
   },
