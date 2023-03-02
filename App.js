@@ -1,4 +1,5 @@
 import { StatusBar } from "expo-status-bar";
+import * as SQLite from "expo-sqlite";
 import {
   StyleSheet,
   Text,
@@ -7,14 +8,28 @@ import {
   TouchableOpacity,
 } from "react-native";
 import Constants from "expo-constants";
-import { Button } from "react-native-web";
 import { useEffect, useState } from "react";
+
+const db = SQLite.openDatabase("gestion.db");
 
 export default function App() {
   const [sumaMesActual, setsumaMesActual] = useState(0);
   const [importeActual, setImporteActual] = useState("");
 
   useEffect(() => {
+    db.transaction((tx) => {
+      tx.executeSql(`CREATE TABLE IF NOT EXISTS gestion(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      Concepto TEXT,
+      Importe REAL,
+      Fecha TEXT)`),
+        (txObj, resultSet) => {
+          console.log(JSON.stringify(resultSet));
+        },
+        (txObj, error) => {
+          console.log("Error: " + error.message);
+        };
+    });
     fetchSumaMesActual();
   }, []);
 
@@ -23,20 +38,38 @@ export default function App() {
       setImporteActual("");
       return;
     }
-    const response = await fetch(
-      `http://localhost:8080/movimiento/Sin Concepto/${signo * importeActual}`,
-      { method: "PUT" }
-    );
+    db.transaction((tx) => {
+      tx.executeSql(
+        `INSERT INTO gestion (Concepto, Importe, Fecha) VALUES (?, ?, datetime('now'))`,
+        ["Sin concepto", importeActual * signo],
+        (txObj, resultSet) => {
+          // console.log(
+          //   "Row:  " + JSON.stringify(resultSet) + "  " + resultSet.rows
+          // );
+        },
+        (txObj, error) => {
+          console.log("Error: " + error.message);
+        }
+      );
+    });
     fetchSumaMesActual();
     setImporteActual("");
   }
 
   async function fetchSumaMesActual() {
-    const response = await fetch(
-      "http://localhost:8080/movimientos/suma/mesActual"
-    );
-    const data = await response.json();
-    setsumaMesActual(data[0]["sum(Importe)"]);
+    db.transaction((tx) => {
+      tx.executeSql(
+        `SELECT sum(Importe) As ImporteSum FROM gestion WHERE STRFTIME("%m-%Y",datetime('now')) = STRFTIME("%m-%Y",Fecha)`,
+        null,
+        (txObj, resultSet) => {
+          console.log("Tesrult" + JSON.stringify(resultSet.rows._array[0]));
+          setsumaMesActual(resultSet.rows._array[0]["ImporteSum"]);
+        },
+        (txObj, error) => {
+          console.log("Error: " + error.message);
+        }
+      );
+    });
   }
   return (
     <View style={styles.general}>
@@ -48,7 +81,10 @@ export default function App() {
         <View style={styles.profit}>
           <Text style={{ fontSize: 40, fontWeight: "400" }}>Profit:</Text>
           <Text style={{ fontSize: 33, fontWeight: "300" }}>
-            {sumaMesActual != null ? sumaMesActual : "0.00"}€
+            {sumaMesActual != null && sumaMesActual != ""
+              ? sumaMesActual
+              : "0.00"}
+            €
           </Text>
         </View>
         <View style={styles.sumadorRestador}>
